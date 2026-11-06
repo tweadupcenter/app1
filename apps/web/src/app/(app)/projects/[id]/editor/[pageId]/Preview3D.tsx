@@ -40,17 +40,22 @@ function usePlanTexture(url: string | null, g: PageGeom) {
 
 function Fit({ box, ortho }: { box: THREE.Box3; ortho: boolean }) {
   const { camera, size } = useThree();
+  const controls = useThree((s) => s.controls) as unknown as { target: THREE.Vector3; update: () => void } | null;
   useEffect(() => {
     const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
     if (ortho) {
       const cam = camera as THREE.OrthographicCamera;
-      cam.position.set(c.x, c.y + 100, c.z); cam.up.set(0, 0, -1); cam.lookAt(c.x, c.y, c.z);
-      cam.zoom = Math.min(size.width / (s.x * 1.1 || 10), size.height / (s.z * 1.1 || 10)); cam.updateProjectionMatrix();
+      cam.position.set(c.x, c.y + 100, c.z + 0.001); cam.up.set(0, 0, -1);
+      cam.zoom = Math.min(size.width / (s.x * 1.15 || 10), size.height / (s.z * 1.15 || 10)); cam.updateProjectionMatrix();
     } else {
-      const d = Math.max(s.x, s.z, 5) * 1.2;
-      camera.position.set(c.x + d * 0.6, c.y + d * 0.7, c.z + d * 0.9); camera.lookAt(c);
+      const d = Math.max(s.x, s.z, 5) * 1.3;
+      camera.up.set(0, 1, 0);
+      camera.position.set(c.x + d * 0.6, c.y + d * 0.7, c.z + d * 0.9);
     }
-  }, [box, ortho]); // eslint-disable-line react-hooks/exhaustive-deps
+    camera.lookAt(c);
+    // les contrôles orbitaux doivent viser le centre du modèle (sinon ils ramènent la vue sur l'origine)
+    if (controls) { controls.target.copy(c); controls.update(); }
+  }, [box, ortho, controls]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 
