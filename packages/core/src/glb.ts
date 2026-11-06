@@ -27,7 +27,7 @@ export interface GlbWriteOptions {
 }
 
 /** Sérialise une hiérarchie three.js (Mesh + MeshStandardMaterial) en GLB. */
-export function objectToGlb(root: THREE.Object3D, opts: GlbWriteOptions = {}): Uint8Array {
+export function objectToGlb(root: THREE.Object3D, opts: GlbWriteOptions = {}): Uint8Array<ArrayBuffer> {
   const json: GltfJson = {
     asset: { version: '2.0', generator: opts.generator ?? 'Tweadup Immo 360', ...(opts.copyright ? { copyright: opts.copyright } : {}) },
     scene: 0,

@@ -146,7 +146,7 @@ input[type="checkbox"], input[type="radio"] { min-height: auto; }
 .vnav button:hover { background: #eef2f3; }
 .vnav button.on { background: var(--c-primary); color: #fff; }
 .vpanel { position: absolute; background: rgba(255,255,255,.95); border: 1px solid var(--c-border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px; z-index: 5; font-size: 13px; }
-.vpanel.tools { top: 64px; inset-inline-start: 10px; display: flex; flex-direction: column; gap: 6px; width: 210px; max-height: calc(100% - 80px); overflow: auto; }
+.vpanel.tools { top: 64px; inset-inline-start: 10px; display: flex; flex-direction: column; gap: 6px; width: 210px; max-height: calc(100% - 240px); overflow: auto; }
 .vpanel.lot { top: 64px; inset-inline-end: 10px; width: 300px; max-height: calc(100% - 80px); overflow: auto; }
 .vpanel.mini { bottom: 10px; inset-inline-start: 10px; padding: 4px; }
 .vpanel.compare { bottom: 10px; inset-inline-end: 10px; max-width: min(640px, calc(100% - 240px)); overflow: auto; }
@@ -184,3 +184,4 @@ dl.kv dd { margin: 0; font-weight: 500; }
 .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
 .thumbs img, .thumbs video { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 6px; border: 1px solid var(--c-border); background: #eee; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.vpanel .row .btn { width: auto; }
