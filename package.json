@@ -1,0 +1,19 @@
+{
+  "name": "tweadup-immo-360",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "db:migrate": "pnpm --filter @immo/db migrate",
+    "db:seed": "pnpm --filter @immo/db seed",
+    "db:reset": "pnpm --filter @immo/db reset",
+    "dev": "pnpm --filter @immo/web dev",
+    "build": "pnpm --filter @immo/web build",
+    "start": "pnpm --filter @immo/web start",
+    "worker": "pnpm --filter @immo/worker start",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @immo/core test && pnpm --filter @immo/db test",
+    "test:e2e": "pnpm --filter @immo/web test:e2e"
+  }
+}

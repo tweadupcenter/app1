@@ -1,0 +1,32 @@
+{
+  "name": "@immo/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./glb": "./src/glb.ts",
+    "./demo-scene": "./src/demo-scene.ts",
+    "./build3d": "./src/build3d.ts",
+    "./storage": "./src/storage.ts",
+    "./unreal": "./src/unreal.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "0.187.0",
+    "zod": "4.6.7",
+    "papaparse": "5.7.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.187.0",
+    "@types/papaparse": "5.5.2",
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}
