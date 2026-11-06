@@ -247,6 +247,7 @@ function CameraRig({ props }: { props: Scene3DProps }) {
   useEffect(() => {
     const ray = new THREE.Raycaster();
     (window as any).__immoScene = {
+      pose: () => ({ position: camera.position.toArray(), fov: (camera as THREE.PerspectiveCamera).fov }),
       screenOf(name: string) {
         const obj = scene.getObjectByName(sanitizeNodeName(name));
         if (!obj) return null;

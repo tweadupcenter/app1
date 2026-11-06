@@ -32,7 +32,7 @@ const handlers: Record<string, (c: JobCtx) => Promise<unknown>> = {
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a);
 
 async function runOne(): Promise<boolean> {
-  const claimed = await withContext(pool, { userId: null, orgId: null }, (t) => t.query('select (immo.claim_job($1,$2)).*', [WORKER_ID, TYPES]));
+  const claimed = await withContext(pool, { userId: null, orgId: null }, (t) => t.query('select * from immo.claim_job($1,$2)', [WORKER_ID, TYPES]));
   const job = claimed.rows[0];
   if (!job?.id) return false;
   log(`▶ ${job.type} ${job.id}`);

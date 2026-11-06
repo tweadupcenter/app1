@@ -2,7 +2,6 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-// @ts-expect-error : dxf-parser n'a pas de types
 import DxfParser from 'dxf-parser';
 import { drawingSchema, type Drawing } from '@immo/core';
 import { imageSize, localStorage, newStorageKey, sha256 } from '@immo/core/storage';
@@ -75,7 +74,7 @@ export function dxfToDrawing(text: string): { drawing: Drawing; report: Record<s
   const [factor, unitLabel] = UNIT_TO_M[insunits] ?? [1, 'non précisées (mètres supposés)'];
   const counts: Record<string, number> = {};
   const segs: [number, number, number, number, string][] = [];
-  for (const e of dxf?.entities ?? []) {
+  for (const e of (dxf?.entities ?? []) as any[]) {
     counts[e.type] = (counts[e.type] ?? 0) + 1;
     const layer = String(e.layer ?? '0');
     if (e.type === 'LINE' && e.vertices?.length >= 2) {

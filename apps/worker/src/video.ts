@@ -22,9 +22,11 @@ function ffmpegEncoder(args: string[], timeoutMs: number) {
     child.on('error', (e) => { clearTimeout(t); reject(new Error(`ffmpeg indisponible : ${e.message}`)); });
     child.on('close', (code) => { clearTimeout(t); code === 0 ? resolve() : reject(new Error(`ffmpeg a échoué (code ${code}) : ${stderr.slice(-600)}`)); });
   });
+  let pipeError: Error | null = null;
+  child.stdin.on('error', (e) => { pipeError = e; });
   const write = (buf: Buffer) => new Promise<void>((resolve, reject) => {
+    if (pipeError) { reject(new Error(`ffmpeg : flux interrompu (${pipeError.message})`)); return; }
     if (!child.stdin.write(buf)) child.stdin.once('drain', resolve); else resolve();
-    child.stdin.once('error', reject);
   });
   return { write, end: () => child.stdin.end(), done };
 }

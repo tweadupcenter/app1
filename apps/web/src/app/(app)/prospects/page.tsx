@@ -18,7 +18,7 @@ export default async function Prospects({ searchParams }: { searchParams: Promis
     if (sp.stage) add('pr.stage = ?', sp.stage);
     if (sp.owner) add('pr.owner_id = ?', sp.owner);
     if (sp.project) add('pr.project_id = ?', sp.project);
-    if (sp.q) add(`(pr.full_name ilike '%'||?||'%' or pr.email ilike '%'||$${p.length}||'%' or pr.phone ilike '%'||$${p.length}||'%')`, sp.q);
+    if (sp.q) { p.push(sp.q); const i = `$${p.length}`; w.push(`(pr.full_name ilike '%'||${i}||'%' or pr.email ilike '%'||${i}||'%' or pr.phone ilike '%'||${i}||'%')`); }
     return {
       role: s.role, me: s.userId,
       users: (await x.query(`select u.id, u.full_name from immo.users u join immo.memberships m on m.user_id=u.id and m.org_id=$1 where m.role <> 'viewer' order by u.full_name`, [s.orgId])).rows,

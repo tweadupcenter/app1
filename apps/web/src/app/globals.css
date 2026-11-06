@@ -149,7 +149,7 @@ input[type="checkbox"], input[type="radio"] { min-height: auto; }
 .vpanel.tools { top: 64px; inset-inline-start: 10px; display: flex; flex-direction: column; gap: 6px; width: 210px; max-height: calc(100% - 240px); overflow: auto; }
 .vpanel.lot { top: 64px; inset-inline-end: 10px; width: 300px; max-height: calc(100% - 80px); overflow: auto; }
 .vpanel.mini { bottom: 10px; inset-inline-start: 10px; padding: 4px; }
-.vpanel.compare { bottom: 10px; inset-inline-end: 10px; max-width: min(640px, calc(100% - 240px)); overflow: auto; }
+.vpanel.compare { bottom: 10px; inset-inline-start: 210px; inset-inline-end: 330px; max-height: 45%; overflow: auto; }
 .vpanel .btn { width: 100%; justify-content: flex-start; }
 .vbadge { position: absolute; bottom: 10px; inset-inline-start: 50%; transform: translateX(-50%); font-size: 11px; color: #3b4650; background: rgba(255,255,255,.8); padding: 2px 8px; border-radius: 4px; z-index: 4; }
 .poi { background: rgba(31,78,95,.92); color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 12px; white-space: nowrap; cursor: pointer; user-select: none; border: 0; }
@@ -185,3 +185,8 @@ dl.kv dd { margin: 0; font-weight: 500; }
 .thumbs img, .thumbs video { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 6px; border: 1px solid var(--c-border); background: #eee; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .vpanel .row .btn { width: auto; }
+@media (max-width: 760px) {
+  .vnav, [dir="rtl"] .vnav { inset-inline-start: 8px; inset-inline-end: 8px; transform: none; flex-wrap: nowrap; overflow-x: auto; border-radius: 12px; justify-content: flex-start; max-width: none; }
+  .vnav button { white-space: nowrap; }
+  .vpanel.tools { max-height: 34%; }
+}

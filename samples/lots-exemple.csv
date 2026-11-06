@@ -1,0 +1,3 @@
+﻿reference;batiment;etage;type;pieces;chambres;surface_commerciale_m2;prix;prix_public;statut;caracteristiques
+D-0-01;;;apartment;3;2;82,5;1150000;oui;available;Terrasse|Parking
+D-0-02;;;studio;1;0;34;520000;non;available;

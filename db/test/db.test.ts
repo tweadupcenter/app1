@@ -15,7 +15,7 @@ const APP_PW = process.env.IMMO_APP_DB_PASSWORD ?? 'immo_app_test_pw'; // le rô
 const APP = (() => { const u = new URL(ADMIN); u.username = 'immo_app'; u.password = APP_PW; return u.toString(); })();
 
 let pool: pg.Pool;
-let S: Awaited<ReturnType<typeof seed>>;
+let S: NonNullable<Awaited<ReturnType<typeof seed>>>;
 
 beforeAll(async () => {
   await migrate(ADMIN, { reset: true, appPassword: APP_PW, log: false });
