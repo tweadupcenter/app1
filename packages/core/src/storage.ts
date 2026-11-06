@@ -77,3 +77,20 @@ export const MIME: Record<DetectedType, string> = {
   pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', glb: 'model/gltf-binary', dxf: 'image/vnd.dxf',
   mp3: 'audio/mpeg', wav: 'audio/wav', mp4: 'video/mp4', csv: 'text/csv', dwg: 'application/acad', unknown: 'application/octet-stream',
 };
+
+/** Dimensions d'une image PNG ou JPEG lues dans l'en-tête (sans décodage). */
+export function imageSize(buf: Uint8Array): { width: number; height: number } | null {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf.length > 24) return { width: dv.getUint32(16), height: dv.getUint32(20) };
+  if (buf[0] === 0xff && buf[1] === 0xd8) {
+    let o = 2;
+    while (o + 9 < buf.length) {
+      if (buf[o] !== 0xff) { o++; continue; }
+      const marker = buf[o + 1];
+      const len = dv.getUint16(o + 2);
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) return { height: dv.getUint16(o + 5), width: dv.getUint16(o + 7) };
+      o += 2 + len;
+    }
+  }
+  return null;
+}

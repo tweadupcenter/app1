@@ -160,3 +160,20 @@ describe('formats et fichiers', () => {
     expect(detectFileType(new TextEncoder().encode('%PDF'), 'x.png')).toBe('unknown');
   });
 });
+
+import { frameAt, totalDuration } from '../src/sequence';
+describe('séquences caméra', () => {
+  const vp: Record<string, any> = { a: { position: [0, 10, 0], target: [0, 0, 0], fov: 40 }, b: { position: [10, 10, 0], target: [10, 0, 0], fov: 60 } };
+  const shots = [{ viewpoint_id: 'a', duration_s: 2, transition: 'cut' as const }, { viewpoint_id: 'b', duration_s: 4, transition: 'move' as const }];
+  it('calcule la durée et interpole entre deux points de vue', () => {
+    expect(totalDuration(shots)).toBe(6);
+    expect(frameAt(shots, (id) => vp[id], 0)!.pose.position).toEqual([0, 10, 0]);
+    const mid = frameAt(shots, (id) => vp[id], 2 + 1)!; // milieu du déplacement (2 s)
+    expect(mid.pose.position[0]).toBeCloseTo(5, 5);
+    expect(mid.shotIndex).toBe(1);
+    expect(frameAt(shots, (id) => vp[id], 99)!.shotIndex).toBe(1);
+  });
+  it('ignore les points de vue supprimés', () => {
+    expect(frameAt([{ viewpoint_id: 'zz', duration_s: 3, transition: 'cut' }], (id) => vp[id], 1)).toBeNull();
+  });
+});

@@ -11,7 +11,9 @@
     "./demo-scene": "./src/demo-scene.ts",
     "./build3d": "./src/build3d.ts",
     "./storage": "./src/storage.ts",
-    "./unreal": "./src/unreal.ts"
+    "./unreal": "./src/unreal.ts",
+    "./sequence": "./src/sequence.ts",
+    "./token": "./src/token.ts"
   },
   "scripts": {
     "test": "vitest run",
