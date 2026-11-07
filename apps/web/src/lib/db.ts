@@ -1,11 +1,11 @@
 import 'server-only';
-import { createPool, withContext, type DbContext, type Tx } from '@immo/db';
+import { appDatabaseUrl, createPool, withContext, type DbContext, type Tx } from '@immo/db';
 import type pg from 'pg';
 
 const g = globalThis as unknown as { __immoPool?: pg.Pool };
 
 export function pool(): pg.Pool {
-  if (!g.__immoPool) g.__immoPool = createPool(process.env.DATABASE_URL, Number(process.env.DB_POOL_MAX ?? 10));
+  if (!g.__immoPool) g.__immoPool = createPool(appDatabaseUrl(), Number(process.env.DB_POOL_MAX ?? 10));
   return g.__immoPool;
 }
 

@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadRootEnv, pgConfig, ROOT_DIR } from './index';
 
-export async function migrate(adminUrl: string, opts: { reset?: boolean; appPassword?: string; log?: boolean } = {}) {
+export async function migrate(adminUrl: string, opts: { reset?: boolean; appPassword?: string; log?: boolean; dir?: string } = {}) {
   const client = new pg.Client(pgConfig(adminUrl));
   await client.connect();
   const log = (...a: unknown[]) => opts.log !== false && console.log(...a);
@@ -14,7 +14,7 @@ export async function migrate(adminUrl: string, opts: { reset?: boolean; appPass
       await client.query('drop schema if exists immo cascade; drop table if exists public.immo_schema_migrations;');
     }
     await client.query(`create table if not exists public.immo_schema_migrations (name text primary key, applied_at timestamptz not null default now())`);
-    const dir = path.join(ROOT_DIR, 'db', 'migrations');
+    const dir = opts.dir ?? path.join(ROOT_DIR, 'db', 'migrations');
     const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
     const done = new Set((await client.query('select name from public.immo_schema_migrations')).rows.map((r) => r.name));
     for (const f of files) {

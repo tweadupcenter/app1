@@ -31,7 +31,21 @@ export function pgConfig(url: string): pg.ClientConfig {
   return { connectionString, ssl, application_name: 'immo360' };
 }
 
-export function createPool(url: string | undefined = process.env.DATABASE_URL, max = 10): pg.Pool {
+/**
+ * Connexion de l'application (rôle immo_app). DATABASE_URL en priorité ; à défaut, dérivée de l'adresse
+ * fournie par l'intégration Supabase de Vercel (POSTGRES_URL) avec le rôle immo_app et IMMO_APP_DB_PASSWORD.
+ */
+export function appDatabaseUrl(env = process.env): string | undefined {
+  if (env.DATABASE_URL) return env.DATABASE_URL;
+  if (!env.POSTGRES_URL || !env.IMMO_APP_DB_PASSWORD) return undefined;
+  const u = new URL(env.POSTGRES_URL);
+  const ref = u.username.includes('.') ? u.username.slice(u.username.indexOf('.') + 1) : '';
+  u.username = ref ? `immo_app.${ref}` : 'immo_app';
+  u.password = encodeURIComponent(env.IMMO_APP_DB_PASSWORD);
+  return u.toString();
+}
+
+export function createPool(url: string | undefined = appDatabaseUrl(), max = 10): pg.Pool {
   if (!url) throw new Error('DATABASE_URL manquant');
   return new pg.Pool({ ...pgConfig(url), max, idleTimeoutMillis: 10_000 });
 }

@@ -2,7 +2,7 @@
 // expiration des options. Usage : tsx src/index.ts [--once]
 import { hostname } from 'node:os';
 import path from 'node:path';
-import { createPool, loadRootEnv, ROOT_DIR, withContext, type Tx } from '@immo/db';
+import { appDatabaseUrl, createPool, loadRootEnv, ROOT_DIR, withContext, type Tx } from '@immo/db';
 import { rasterizePlan, importDxf } from './plans';
 import { inspectModel } from './models';
 import { exportVideo } from './video';
@@ -10,7 +10,7 @@ import { exportVideo } from './video';
 loadRootEnv();
 process.env.STORAGE_DIR = path.resolve(ROOT_DIR, process.env.STORAGE_DIR ?? 'storage');
 
-const pool = createPool(process.env.DATABASE_URL, 4);
+const pool = createPool(appDatabaseUrl(), 4);
 const WORKER_ID = `${hostname()}:${process.pid}`;
 const TYPES = ['plan_rasterize', 'dxf_import', 'model_inspect', 'video_export'];
 
