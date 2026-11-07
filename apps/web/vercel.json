@@ -8,6 +8,6 @@
     "src/app/**/*": { "maxDuration": 60 }
   },
   "crons": [
-    { "path": "/api/cron/expire-holds", "schedule": "*/10 * * * *" }
+    { "path": "/api/cron/expire-holds", "schedule": "17 3 * * *" }
   ]
 }

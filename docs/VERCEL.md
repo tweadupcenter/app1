@@ -12,6 +12,10 @@ n'a ni disque persistant, ni Chromium/ffmpeg, et ses requêtes sont limitées à
 Sans worker, l'application fonctionne mais les plans importés, maquettes et vidéos restent « en file ».
 
 ## 1. Base de données (Supabase)
+
+Sans outil installé : exécuter le fichier SQL d'installation complet (schéma + données) dans l'éditeur SQL de Supabase
+(kit `deploy-vercel/`, généré par `pg_dump --no-owner --inserts -n immo --exclude-table-data=immo.sessions`). Sinon :
+
 1. Créer un projet Supabase (région Europe, ex. Frankfurt).
 2. Depuis votre poste, avec la chaîne de connexion **directe** (Settings → Database, port 5432, utilisateur `postgres`) :
    ```bash
@@ -60,9 +64,8 @@ Le schéma `immo` n'est pas exposé par l'API REST de Supabase : ne l'ajoutez pa
 | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (utilise pnpm 10.28 déclaré dans `package.json`) |
 
 4. Déployer. Vérifier `https://…/api/health` → `{"ok":true,"db":"ok"}`.
-5. Tâche planifiée : `vercel.json` déclare `/api/cron/expire-holds` toutes les 10 minutes (plan Pro ; sur le plan
-   Hobby, Vercel limite les tâches à une par jour : modifier la planification). Les options expirent de toute façon à
-   chaque lecture des lots et dans le worker.
+5. Tâche planifiée : `vercel.json` déclare `/api/cron/expire-holds` une fois par jour (limite du plan Hobby ; sur le plan
+   Pro, passer à `*/10 * * * *`). Les options expirent de toute façon à chaque lecture des lots et dans le worker.
 
 ## 4. Worker
 Image : `docker build --target worker -t immo360-worker .` (Chromium, ffmpeg, poppler inclus). Variables :
