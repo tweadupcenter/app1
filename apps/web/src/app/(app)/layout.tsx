@@ -15,26 +15,32 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="shell">
       <aside className="sidebar" aria-label="Navigation principale">
-        <div className="brand"><span className="dot" />Tweadup Immo 360</div>
-        <NavLinks links={links} />
-        <div className="sep" />
-        {orgs.length > 1 ? (
-          <form action={switchOrg} className="stack" style={{ padding: '0 6px' }}>
-            <label className="small" htmlFor="org">Organisation</label>
-            <select id="org" name="org" defaultValue={s.orgId}>
-              {orgs.map((o) => <option key={o.org_id} value={o.org_id}>{o.name}</option>)}
-            </select>
-            <button className="btn btn-sm">Changer</button>
+        <div className="brand-row">
+          <div className="brand"><span className="dot" />Tweadup Immo 360</div>
+          <label htmlFor="menu-toggle" className="menu-btn" aria-label="Ouvrir ou fermer le menu">☰ Menu</label>
+        </div>
+        <input type="checkbox" id="menu-toggle" className="menu-toggle sr-only" />
+        <div className="navwrap">
+          <NavLinks links={links} />
+          <div className="sep" />
+          {orgs.length > 1 ? (
+            <form action={switchOrg} className="stack" style={{ padding: '0 6px' }}>
+              <label className="small" htmlFor="org">Organisation</label>
+              <select id="org" name="org" defaultValue={s.orgId}>
+                {orgs.map((o) => <option key={o.org_id} value={o.org_id}>{o.name}</option>)}
+              </select>
+              <button className="btn btn-sm">Changer</button>
+            </form>
+          ) : <div className="small" style={{ padding: '0 10px' }}>{s.orgName}</div>}
+          <form action={setLanguage} className="row" style={{ padding: '8px 6px' }}>
+            <button name="lang" value="fr" className={`btn btn-sm ${locale === 'fr' ? 'on' : ''}`}>FR</button>
+            <button name="lang" value="ar" className={`btn btn-sm ${locale === 'ar' ? 'on' : ''}`}>العربية</button>
           </form>
-        ) : <div className="small" style={{ padding: '0 10px' }}>{s.orgName}</div>}
-        <form action={setLanguage} className="row" style={{ padding: '8px 6px' }}>
-          <button name="lang" value="fr" className={`btn btn-sm ${locale === 'fr' ? 'on' : ''}`}>FR</button>
-          <button name="lang" value="ar" className={`btn btn-sm ${locale === 'ar' ? 'on' : ''}`}>العربية</button>
-        </form>
-        <div className="foot">
-          <div style={{ color: '#fff' }}>{s.fullName}</div>
-          <div>{t(`role.${s.role}`)}</div>
-          <form action={logoutAction}><button className="btn btn-sm" style={{ marginTop: 6 }}>{t('nav.logout')}</button></form>
+          <div className="foot">
+            <div style={{ color: '#fff' }}>{s.fullName}</div>
+            <div>{t(`role.${s.role}`)}</div>
+            <form action={logoutAction}><button className="btn btn-sm" style={{ marginTop: 6 }}>{t('nav.logout')}</button></form>
+          </div>
         </div>
       </aside>
       <main className="main">{children}</main>

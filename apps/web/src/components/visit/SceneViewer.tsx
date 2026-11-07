@@ -4,7 +4,8 @@ import dynamic from 'next/dynamic';
 import { formatM2, formatMAD, planToWorld, type CameraPose, type Vec2 } from '@immo/core';
 import { translator, type Locale } from '@/lib/i18n';
 import type { SceneData, SceneLot, SceneViewpoint } from '@/lib/scene-types';
-import type { SceneApi } from './Scene3D';
+import type { SceneApi, WallInfo } from './Scene3D';
+import { polygonArea, type Vec2 as V2 } from '@immo/core';
 import { Minimap } from './Minimap';
 
 const Scene3D = dynamic(() => import('./Scene3D').then((m) => m.Scene3D), { ssr: false });
@@ -59,6 +60,11 @@ export function SceneViewer(p: SceneViewerProps) {
   const [level, setLevel] = useState<number | null>(null);
   const [statusColors, setStatusColors] = useState(true);
   const [section, setSection] = useState<number | null>(null);
+  const hasDrafts = !!data.drafts?.length;
+  const [draft, setDraft] = useState({ show: hasDrafts && !data.model, showPlan: true, planOpacity: 0.85, wallHeight: null as number | null });
+  const [wall, setWall] = useState<WallInfo | null>(null);
+  const [wide, setWide] = useState(true);
+  useEffect(() => { try { setWide(window.matchMedia('(min-width: 761px)').matches); } catch { /* ignore */ } }, []);
   const [flyTo, setFlyTo] = useState<{ pose: CameraPose; key: number } | null>(null);
   const [activeVp, setActiveVp] = useState<string | null>(null);
   const [tour, setTour] = useState<{ shots: any[]; start: number } | null>(null);
@@ -95,7 +101,15 @@ export function SceneViewer(p: SceneViewerProps) {
     .filter((v) => v.show_in_nav && (v.kind !== 'amenity' || (v.amenity_id && amenityIds.has(v.amenity_id))) && (v.kind !== 'building' || (v.building_id && buildingIds.has(v.building_id))))
     .sort((a, b) => (NAV_ORDER[a.kind] ?? 9) - (NAV_ORDER[b.kind] ?? 9) || a.sort_order - b.sort_order), [data.viewpoints]); // eslint-disable-line react-hooks/exhaustive-deps
   const overview = data.viewpoints.find((v) => v.kind === 'overview') ?? data.viewpoints[0];
-  const initialPose: CameraPose = overview ? { position: overview.position, target: overview.target, fov: Number(overview.fov) } : { position: [80, 70, 90], target: [0, 0, 0], fov: 45 };
+  const draftPose = (): CameraPose | null => {
+    const pts = (data.drafts ?? []).flatMap((d) => [...d.drawing.walls.flatMap((w) => [w.a, w.b]), ...d.drawing.rooms.flatMap((r) => r.points)]) as [number, number][];
+    if (!pts.length) return null;
+    const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const size = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 6);
+    return { position: [cx + size * 0.9, size * 1.1, -cy + size * 1.1], target: [cx, 0.5, -cy], fov: 45 };
+  };
+  const initialPose: CameraPose = overview ? { position: overview.position, target: overview.target, fov: Number(overview.fov) } : draftPose() ?? { position: [80, 70, 90], target: [0, 0, 0], fov: 45 };
   const lot = data.lots.find((l) => l.id === selectedLot) ?? null;
   const floorsOf = (b: string | null) => data.floors.filter((f) => f.building_id === b).sort((a, c) => a.level - c.level);
   const flyVp = (v: SceneViewpoint) => { setTour(null); setActiveVp(v.id); setFlyTo({ pose: { position: v.position, target: v.target, fov: Number(v.fov) }, key: Date.now() }); };
@@ -176,7 +190,7 @@ export function SceneViewer(p: SceneViewerProps) {
       {can3d && <Boundary onError={(e) => setError3d(e.message)}>
         <Scene3D data={data} statusColors={statusColors} selectedLotId={selectedLot} isolate={building && level != null ? { buildingId: building, level } : null}
           sectionHeight={section} flyTo={flyTo} tour={tour} onTourEnd={() => setTour(null)} onSelectLot={selectLot} onSelectBuilding={(id) => selectBuilding(id)}
-          onPoi={onPoi} onCamera={setCamPose} onReady={(a) => { api.current = a; }} initialPose={initialPose} />
+          onPoi={onPoi} onCamera={setCamPose} onReady={(a) => { api.current = a; }} initialPose={initialPose} draft={draft} onWallInfo={setWall} />
       </Boundary>}
       {!loaded && <div className="vbadge" style={{ top: '50%', bottom: 'auto' }}>{t('common.loading')}</div>}
       <nav className="vnav" aria-label="Points de visite" data-testid="vnav">
@@ -198,6 +212,16 @@ export function SceneViewer(p: SceneViewerProps) {
         <button className="btn btn-sm" onClick={capture}>Capturer l’image</button>
         <div className="small muted">{t('visit.favorites')} : {fav.length}</div>
         {fav.length > 0 && <div className="row">{fav.map((id) => { const l = data.lots.find((x) => x.id === id); return l ? <button key={id} className="btn btn-sm" onClick={() => selectLot(id)}>★ {l.reference}</button> : null; })}</div>}
+        {hasDrafts && <div className="stack" style={{ borderTop: '1px solid var(--c-border)', paddingTop: 6 }} data-testid="draft-panel">
+          <b className="small">Ébauche des plans</b>
+          <label className="check small"><input type="checkbox" checked={draft.show} onChange={(e) => setDraft({ ...draft, show: e.target.checked })} data-testid="draft-toggle" /> <span>Afficher le tracé (non validé)</span></label>
+          {draft.show && <>
+            <label className="check small"><input type="checkbox" checked={draft.showPlan} onChange={(e) => setDraft({ ...draft, showPlan: e.target.checked })} /> <span>Plan sous la maquette</span></label>
+            <label className="field"><span>Opacité du plan</span><input type="range" min={0} max={1} step={0.05} value={draft.planOpacity} onChange={(e) => setDraft({ ...draft, planOpacity: Number(e.target.value) })} /></label>
+            <label className="field"><span>Hauteur des murs : {draft.wallHeight ? `${draft.wallHeight.toFixed(1).replace('.', ',')} m` : 'réelle'}</span>
+              <input type="range" min={0.5} max={3.5} step={0.1} value={draft.wallHeight ?? 3.5} onChange={(e) => { const v = Number(e.target.value); setDraft({ ...draft, wallHeight: v >= 3.5 ? null : v }); }} aria-label="Hauteur des murs" /></label>
+          </>}
+        </div>}
         {p.admin && <div className="stack" style={{ borderTop: '1px solid var(--c-border)', paddingTop: 6 }}>
           <b className="small">Points de visite (administration)</b>
           <input placeholder="Libellé du nouveau point" value={vpLabel} onChange={(e) => setVpLabel(e.target.value)} data-testid="vp-label" />
@@ -234,6 +258,26 @@ export function SceneViewer(p: SceneViewerProps) {
           </div>
         </div>
       )}
+      {draft.show && hasDrafts && !lot && (
+        <div className="vpanel lot draft" data-testid="draft-info">
+          <div className="row between"><h3 style={{ margin: 0 }}>Ébauche non validée</h3></div>
+          {wall ? <div className="stack small" data-testid="wall-info" style={{ gap: 2 }}>
+            <b>Mur {wall.id} — {wall.draft}</b>
+            <span>Longueur {wall.lengthM.toFixed(2).replace('.', ',')} m · épaisseur {Math.round(wall.thickness * 100)} cm · hauteur {wall.height.toFixed(2).replace('.', ',')} m</span>
+            <span>Statut : {t(`prov.${wall.provenance}`)}</span>
+          </div> : <p className="small muted" style={{ margin: 0 }}>Cliquez un mur pour voir sa longueur et son statut.</p>}
+          {data.drafts!.map((d) => (
+            <div key={d.pageId} className="stack small" style={{ gap: 4, marginTop: 8 }}>
+              <div className="row between"><b>{d.label}</b><a href={d.editorUrl}>Éditer (v{d.version})</a></div>
+              <div>{['documented', 'estimated', 'proposed', 'validated'].map((k) => <span key={k} className={`tag prov-${k}`} style={{ marginInlineEnd: 4 }}>{t(`prov.${k}`)} {d.drawing.walls.filter((w) => w.provenance === k).length}</span>)}</div>
+              {d.drawing.rooms.length > 0 && <details className="draft-rooms" open={wide} key={String(wide)}><summary className="small">Pièces tracées ({d.drawing.rooms.length})</summary><table className="table small"><thead><tr><th>Pièce</th><th className="right">Tracé</th><th>Statut</th></tr></thead><tbody>
+                {d.drawing.rooms.map((r) => <tr key={r.id}><td>{r.name}</td><td className="right nowrap">{polygonArea(r.points as V2[]).toFixed(2).replace('.', ',')} m²</td><td>{t(`prov.${r.provenance}`)}</td></tr>)}
+              </tbody></table></details>}
+            </div>
+          ))}
+          <p className="small muted" style={{ marginBottom: 0 }}>Ce tracé n’est visible qu’en interne. Une fois validé, générez la maquette depuis l’éditeur.</p>
+        </div>
+      )}
       {compare.length > 0 && (
         <div className="vpanel compare" data-testid="compare">
           <div className="row between"><b>{t('visit.compare')}</b><button className="btn btn-sm" onClick={() => setCompare([])}>{t('common.close')}</button></div>
@@ -247,7 +291,7 @@ export function SceneViewer(p: SceneViewerProps) {
         </div>
       )}
       <div className="vpanel mini"><Minimap data={data} pose={camPose} selectedBuilding={building} onBuilding={(id) => selectBuilding(id)} /></div>
-      <div className="vbadge">{data.model ? 'Maquette 3D' : 'Volumes procéduraux (aucune maquette active)'} · {data.project.is_fictional ? t('public.fictional') : 'Géométrie indicative'}</div>
+      <div className="vbadge">{draft.show && hasDrafts ? 'Ébauche non validée · ' : ''}{data.model ? 'Maquette 3D' : hasDrafts ? 'Aucune maquette générée' : 'Volumes procéduraux (aucune maquette active)'} · {data.project.is_fictional ? t('public.fictional') : 'Géométrie indicative'}</div>
     </div>
   );
 }

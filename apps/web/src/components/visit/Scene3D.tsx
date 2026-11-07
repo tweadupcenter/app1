@@ -5,8 +5,12 @@ import { Html, OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { frameAt, interpolatePose, planToWorld, STATUS_COLORS, type CameraPose, type LotStatus, type Shot, type Vec2 } from '@immo/core';
 import { sanitizeNodeName } from '@immo/core/glb';
-import { createMaterials, slab } from '@immo/core/build3d';
-import type { SceneData } from '@/lib/scene-types';
+import { buildFromDrawing, createMaterials, slab } from '@immo/core/build3d';
+import type { SceneData, SceneDraft } from '@/lib/scene-types';
+import { planExtent, usePlanTexture } from './planTexture';
+
+export interface DraftOptions { show: boolean; showPlan: boolean; planOpacity: number; wallHeight: number | null }
+export interface WallInfo { id: string; lengthM: number; thickness: number; height: number; provenance: string; draft: string }
 
 export interface SceneApi {
   getPose(): CameraPose;
@@ -32,6 +36,8 @@ export interface Scene3DProps {
   onError?: (e: Error) => void;
   renderMode?: boolean;
   initialPose: CameraPose;
+  draft?: DraftOptions;
+  onWallInfo?: (w: WallInfo | null) => void;
 }
 
 type Binding = { target_type: string; target_id: string };
@@ -219,7 +225,13 @@ function CameraRig({ props }: { props: Scene3DProps }) {
   };
   const pose = (): CameraPose => ({ position: cam.position.toArray() as [number, number, number], target: (controls?.target ?? target.current).toArray() as [number, number, number], fov: cam.fov });
 
+  // Les contrôles orbitaux sont créés après la caméra : on réapplique la pose initiale dès qu'ils existent,
+  // sinon ils visent l'origine (0,0,0) au lieu du point de vue enregistré.
+  const appliedWithControls = useRef(false);
   useEffect(() => { apply(props.initialPose); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (controls && !appliedWithControls.current && !flight.current) { appliedWithControls.current = true; apply(props.initialPose); }
+  }, [controls]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!props.flyTo) return;
     flight.current = { from: pose(), to: props.flyTo.pose, start: performance.now(), dur: 1400 };
@@ -291,6 +303,47 @@ function CameraRig({ props }: { props: Scene3DProps }) {
   return null;
 }
 
+const PROV_COLOR: Record<string, string> = { documented: '#7f9fcf', estimated: '#d9b45c', proposed: '#b98fd6', validated: '#7fbf98' };
+
+/** Ébauche d'un niveau : tracé (validé ou non) extrudé, coloré selon le statut des éléments, posé sur le plan. */
+function DraftLevel({ d, opts, onWall }: { d: SceneDraft; opts: DraftOptions; onWall?: (w: WallInfo | null) => void }) {
+  const group = useMemo(() => {
+    const drawing = opts.wallHeight ? { ...d.drawing, walls: d.drawing.walls.map((w) => ({ ...w, height: Math.min(w.height, opts.wallHeight!) })) } : d.drawing;
+    const g = buildFromDrawing(drawing, { elevation: d.elevation, levelKey: `draft_${d.pageId.slice(0, 8)}`, includeUnvalidated: true });
+    const mats: Record<string, THREE.MeshStandardMaterial> = {};
+    const mat = (p: string) => (mats[p] ??= new THREE.MeshStandardMaterial({ color: PROV_COLOR[p] ?? '#cccccc', roughness: 0.85 }));
+    const byId = new Map(drawing.walls.map((w) => [w.id, w]));
+    g.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !o.name.startsWith('wall_')) return;
+      const id = o.parent?.userData.drawingId as string | undefined;
+      const w = id ? byId.get(id) : undefined;
+      if (w) { m.material = mat(w.provenance); m.userData.wallInfo = { id: w.id, lengthM: Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]), thickness: w.thickness, height: w.height, provenance: w.provenance, draft: d.label }; }
+    });
+    return g;
+  }, [d, opts.wallHeight]);
+  const geom = d.plan ? { width: d.plan.width, height: d.plan.height, rotation: d.plan.rotation, crop: d.plan.crop, scale: d.plan.scale } : null;
+  const tex = usePlanTexture(d.plan?.url ?? null, geom ?? { width: 1, height: 1, rotation: 0, crop: null, scale: 0.01 });
+  const ext = geom ? planExtent(geom) : null;
+  return (
+    <group>
+      <primitive object={group} onClick={(e: ThreeEvent<MouseEvent>) => { if (e.delta > 6) return; e.stopPropagation(); onWall?.((e.object.userData.wallInfo as WallInfo) ?? null); }} />
+      {opts.showPlan && tex && ext && (
+        <mesh rotation-x={-Math.PI / 2} position={[ext.w / 2, d.elevation + 0.01, -ext.h / 2]} renderOrder={-1}>
+          <planeGeometry args={[ext.w, ext.h]} />
+          <meshBasicMaterial map={tex} transparent opacity={opts.planOpacity} depthWrite={false} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+function DraftLayer({ props }: { props: Scene3DProps }) {
+  const opts = props.draft;
+  if (!opts?.show || props.renderMode || !props.data.drafts?.length) return null;
+  return <>{props.data.drafts.map((d) => <DraftLevel key={d.pageId} d={d} opts={opts} onWall={props.onWallInfo} />)}</>;
+}
+
 export function Scene3D(props: Scene3DProps) {
   return (
     <Canvas
@@ -311,6 +364,7 @@ export function Scene3D(props: Scene3DProps) {
         <Ready props={props} />
       </Suspense>
       <Pois props={props} />
+      <DraftLayer props={props} />
       {!props.renderMode && <OrbitControls makeDefault enableDamping dampingFactor={0.12} maxPolarAngle={Math.PI * 0.495} minDistance={1.5} maxDistance={450} enabled={!props.tour} />}
       <CameraRig props={props} />
     </Canvas>

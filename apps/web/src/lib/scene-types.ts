@@ -22,6 +22,19 @@ export interface SceneData {
   /** préfixe des URL de fichiers : /api/files/ (interne) ou /api/public/<slug>/files/ */
   fileBase: string;
   planImages: { id: string; label: string }[];
+  /** Ébauches de tracé (version de travail interne uniquement, jamais publiées). */
+  drafts?: SceneDraft[];
   gallery: { id: string; kind: string }[];
   contact?: { phone?: string | null; email?: string | null; whatsapp?: string | null; orgName?: string };
+}
+
+export interface SceneDraft {
+  pageId: string;
+  label: string;
+  elevation: number;
+  floorHeight: number;
+  version: number;
+  drawing: import('@immo/core').Drawing;
+  plan: { url: string; width: number; height: number; rotation: 0 | 90 | 180 | 270; crop: { x: number; y: number; w: number; h: number } | null; scale: number | null } | null;
+  editorUrl: string;
 }

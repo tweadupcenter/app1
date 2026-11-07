@@ -1,6 +1,7 @@
 import 'server-only';
 import type { Tx } from './db';
-import type { SceneData } from './scene-types';
+import { drawingSchema } from '@immo/core';
+import type { SceneData, SceneDraft } from './scene-types';
 
 /** Version de travail (interne) : données en direct, maquette active. */
 export async function internalSceneData(x: Tx, projectId: string): Promise<SceneData | null> {
@@ -23,7 +24,29 @@ export async function internalSceneData(x: Tx, projectId: string): Promise<Scene
     planImages: (await x.query(`select pp.image_media_id id, coalesce(pp.level_label, p.name || ' p' || (pp.page_index+1)) label from immo.plan_pages pp join immo.plans p on p.id=pp.plan_id where p.project_id=$1 and pp.selected and pp.image_media_id is not null`, [projectId])).rows,
     gallery: (await x.query(`select id, kind from immo.media where project_id=$1 and kind in ('image','capture') order by created_at desc limit 30`, [projectId])).rows,
     contact: { ...(o?.contact ?? {}), orgName: o?.name },
+    drafts: await draftsFor(x, projectId),
   };
+}
+
+/** Dernière version du tracé de chaque page associée à un étage (éléments validés ou non). */
+async function draftsFor(x: Tx, projectId: string): Promise<SceneDraft[]> {
+  const rows = (await x.query(`select pp.id, pp.image_media_id, pp.width_px, pp.height_px, pp.rotation, pp.crop, pp.scale_m_per_px, pp.level_label, pp.floor_height_m,
+      p.name plan_name, pp.page_index, f.elevation_m, d.version, d.data
+    from immo.plan_pages pp join immo.plans p on p.id=pp.plan_id
+    left join immo.floors f on f.id=pp.floor_id
+    join lateral (select version, data from immo.plan_drawings where plan_page_id=pp.id order by version desc limit 1) d on true
+    where p.project_id=$1 order by f.elevation_m nulls first, p.created_at`, [projectId])).rows;
+  const out: SceneDraft[] = [];
+  for (const r of rows) {
+    const parsed = drawingSchema.safeParse(r.data);
+    if (!parsed.success || (!parsed.data.walls.length && !parsed.data.rooms.length)) continue;
+    out.push({
+      pageId: r.id, label: r.level_label ?? `${r.plan_name} p${r.page_index + 1}`, elevation: Number(r.elevation_m ?? 0), floorHeight: Number(r.floor_height_m ?? 3),
+      version: r.version, drawing: parsed.data, editorUrl: `/projects/${projectId}/editor/${r.id}`,
+      plan: r.image_media_id ? { url: `/api/files/${r.image_media_id}`, width: r.width_px, height: r.height_px, rotation: r.rotation, crop: r.crop, scale: r.scale_m_per_px == null ? null : Number(r.scale_m_per_px) } : null,
+    });
+  }
+  return out;
 }
 
 /** Version publique : uniquement l'instantané publié + statuts en direct. */

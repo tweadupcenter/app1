@@ -9,33 +9,12 @@ import { objectToGlb } from '@immo/core/glb';
 import Link from 'next/link';
 import { effectiveCrop, type PageGeom } from '@/lib/plan-transform';
 import { autoBindGenerated } from '../../models/actions';
+import { usePlanTexture } from '@/components/visit/planTexture';
 
 interface Props {
   drawing: Drawing; dirty: boolean; geom: PageGeom; projectId: string; canEdit: boolean; generatedModelId: string | null;
   page: { id: string; imageUrl: string | null; label: string; calibrated: boolean };
   floor: { elevation: number; height: number; label: string } | null;
-}
-
-function usePlanTexture(url: string | null, g: PageGeom) {
-  const [tex, setTex] = useState<THREE.Texture | null>(null);
-  useEffect(() => {
-    if (!url) return;
-    const img = new Image();
-    img.onload = () => {
-      const c = effectiveCrop(g);
-      const f = Math.min(1, 2048 / Math.max(c.w, c.h));
-      const cv = document.createElement('canvas'); cv.width = Math.round(c.w * f); cv.height = Math.round(c.h * f);
-      const ctx = cv.getContext('2d')!;
-      ctx.scale(f, f); ctx.translate(-c.x, -c.y);
-      if (g.rotation === 90) ctx.transform(0, 1, -1, 0, g.height, 0);
-      if (g.rotation === 180) ctx.transform(-1, 0, 0, -1, g.width, g.height);
-      if (g.rotation === 270) ctx.transform(0, -1, 1, 0, 0, g.width);
-      ctx.drawImage(img, 0, 0);
-      const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; setTex(t);
-    };
-    img.src = url;
-  }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
-  return tex;
 }
 
 function Fit({ box, ortho }: { box: THREE.Box3; ortho: boolean }) {

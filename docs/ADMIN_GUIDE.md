@@ -22,7 +22,10 @@
    (associations reportées / nœuds disparus) puis l'activer.
 6. **Visite** : se placer, puis « Enregistrer la vue actuelle » ; le tableau sous la visite règle libellé, type, ordre,
    équipement lié et présence dans la barre. Un bouton d'équipement n'apparaît que si l'équipement existe.
-7. **Publication** : « Publier » fige une version publique ; « Révoquer » coupe immédiatement le lien et les fichiers publics.
+7. **Ébauche dans la visite** : tant qu'aucune maquette n'est générée, la visite interne affiche le tracé des plans
+   (validé ou non), coloré selon le statut des éléments, avec le plan dessous. Clic sur un mur = longueur, épaisseur,
+   statut. Ce mode n'est jamais visible sur la présentation publique.
+8. **Publication** : « Publier » fige une version publique ; « Révoquer » coupe immédiatement le lien et les fichiers publics.
 
 ## Lots
 Statuts : Disponible, Option temporaire (durée obligatoire, expiration contrôlée par le serveur), Réservé, Vendu,

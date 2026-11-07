@@ -1,0 +1,41 @@
+# Déploiement de production sur un serveur unique : docker compose -f docker-compose.prod.yml --env-file .env up -d
+# Placez un reverse proxy HTTPS (Caddy, Traefik, Nginx) devant le service web.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?définir POSTGRES_PASSWORD}
+      POSTGRES_DB: immo360
+    volumes: [db-data:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres"], interval: 10s, retries: 10 }
+  migrate:
+    build: { context: ., target: build }
+    command: ["pnpm", "db:migrate"]
+    environment:
+      DATABASE_ADMIN_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/immo360
+      IMMO_APP_DB_PASSWORD: ${IMMO_APP_DB_PASSWORD:?définir IMMO_APP_DB_PASSWORD}
+    depends_on: { db: { condition: service_healthy } }
+  web:
+    build: { context: ., target: web }
+    restart: unless-stopped
+    environment: &appenv
+      DATABASE_URL: postgres://immo_app:${IMMO_APP_DB_PASSWORD}@db:5432/immo360
+      APP_SECRET: ${APP_SECRET:?définir APP_SECRET (32+ caractères)}
+      APP_URL: ${APP_URL:?définir APP_URL (https://…)}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      STORAGE_DIR: /data/storage
+    volumes: [storage:/data/storage]
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+  worker:
+    build: { context: ., target: worker }
+    restart: unless-stopped
+    environment:
+      <<: *appenv
+      APP_URL: http://web:3000
+    volumes: [storage:/data/storage]
+    depends_on: { web: { condition: service_healthy } }
+volumes:
+  db-data: {}
+  storage: {}

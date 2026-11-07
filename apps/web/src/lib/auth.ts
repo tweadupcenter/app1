@@ -81,7 +81,9 @@ export async function assertSameOrigin(req: Request) {
   const origin = req.headers.get('origin');
   const h = await headers();
   const host = h.get('x-forwarded-host') ?? h.get('host');
-  if (!origin || !host || new URL(origin).host !== host) throw new HttpError(403, 'Origine de la requête refusée.');
+  const allowed = (process.env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const oh = origin ? new URL(origin).host : null;
+  if (!oh || !host || (oh !== host && !allowed.includes(oh))) throw new HttpError(403, 'Origine de la requête refusée.');
 }
 
 export async function logout() {
