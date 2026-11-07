@@ -11,6 +11,13 @@ n'a ni disque persistant, ni Chromium/ffmpeg, et ses requêtes sont limitées à
 
 Sans worker, l'application fonctionne mais les plans importés, maquettes et vidéos restent « en file ».
 
+## Installation automatique (intégration Supabase de Vercel)
+Projet Vercel → Storage → Create Database → Supabase (connecté au projet) : l'intégration fournit `POSTGRES_URL`,
+`POSTGRES_URL_NON_POOLING`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`… Ajouter ensuite `IMMO_APP_DB_PASSWORD`,
+`SEED_PASSWORD`, `SETUP_KEY` (64 caractères), `STORAGE_DRIVER=supabase`, redéployer, puis appeler une fois
+`POST /api/setup` avec `Authorization: Bearer <SETUP_KEY>` (migrations, rôle `immo_app`, bucket, démo fictive).
+La connexion `immo_app` est dérivée de `POSTGRES_URL` (pas de `DATABASE_URL` à saisir). Désactiver ensuite `SETUP_KEY`.
+
 ## 1. Base de données (Supabase)
 
 Sans outil installé : exécuter le fichier SQL d'installation complet (schéma + données) dans l'éditeur SQL de Supabase
