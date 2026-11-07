@@ -2,10 +2,10 @@
 import pg from 'pg';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { loadRootEnv, ROOT_DIR } from './index';
+import { loadRootEnv, pgConfig, ROOT_DIR } from './index';
 
 export async function migrate(adminUrl: string, opts: { reset?: boolean; appPassword?: string; log?: boolean } = {}) {
-  const client = new pg.Client({ connectionString: adminUrl });
+  const client = new pg.Client(pgConfig(adminUrl));
   await client.connect();
   const log = (...a: unknown[]) => opts.log !== false && console.log(...a);
   try {

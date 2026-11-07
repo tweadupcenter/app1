@@ -1,25 +1,34 @@
 // Stockage privé des fichiers (serveur uniquement).
-// Implémentation locale (disque). L'interface permet un adaptateur S3/Supabase Storage.
+// Deux pilotes : disque local (développement, serveur unique) ou objet compatible S3
+// (Supabase Storage, Cloudflare R2, AWS S3, MinIO) pour Vercel et les déploiements sans disque persistant.
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
+import { mkdir, readFile, rm, stat, writeFile, open } from 'node:fs/promises';
 import path from 'node:path';
 
 export interface StorageAdapter {
-  put(key: string, data: Uint8Array): Promise<void>;
+  readonly driver: 'local' | 's3';
+  put(key: string, data: Uint8Array, contentType?: string): Promise<void>;
   get(key: string): Promise<Buffer>;
-  stream(key: string): NodeJS.ReadableStream;
-  size(key: string): Promise<number>;
+  /** Premiers octets du fichier (détection du type, dimensions) sans tout télécharger. */
+  head(key: string, bytes: number): Promise<Buffer>;
+  size(key: string): Promise<number | null>;
   remove(key: string): Promise<void>;
-  localPath(key: string): string;
+  /** Lien de lecture temporaire (S3 uniquement ; null en local : le fichier est servi par l'application). */
+  signedGetUrl(key: string, opts: { expiresIn?: number; contentType?: string; filename?: string; download?: boolean }): Promise<string | null>;
+  /** Lien d'envoi direct temporaire (S3 uniquement). */
+  signedPutUrl(key: string, contentType: string, expiresIn?: number): Promise<string | null>;
 }
 
 export function storageRoot(): string {
   return path.resolve(process.env.STORAGE_DIR ?? path.join(process.cwd(), 'storage'));
 }
 
+export function assertKey(key: string) {
+  if (!/^[a-z0-9_\-/]+(\.[a-z0-9]{1,5})?$/i.test(key) || key.includes('..') || key.startsWith('/')) throw new Error('Clé de stockage invalide');
+}
+
 function safeKey(root: string, key: string): string {
-  if (!/^[a-z0-9_\-/]+(\.[a-z0-9]{1,5})?$/i.test(key) || key.includes('..')) throw new Error('Clé de stockage invalide');
+  assertKey(key);
   const p = path.resolve(root, key);
   if (!p.startsWith(root + path.sep)) throw new Error('Clé de stockage hors racine');
   return p;
@@ -27,17 +36,73 @@ function safeKey(root: string, key: string): string {
 
 export function localStorage(root = storageRoot()): StorageAdapter {
   return {
+    driver: 'local',
     async put(key, data) {
       const p = safeKey(root, key);
       await mkdir(path.dirname(p), { recursive: true, mode: 0o750 });
       await writeFile(p, data, { mode: 0o640 });
     },
     get: (key) => readFile(safeKey(root, key)),
-    stream: (key) => createReadStream(safeKey(root, key)),
-    size: async (key) => (await stat(safeKey(root, key))).size,
+    async head(key, bytes) {
+      const fh = await open(safeKey(root, key), 'r');
+      try { const b = Buffer.alloc(bytes); const { bytesRead } = await fh.read(b, 0, bytes, 0); return b.subarray(0, bytesRead); } finally { await fh.close(); }
+    },
+    size: async (key) => { try { return (await stat(safeKey(root, key))).size; } catch { return null; } },
     remove: (key) => rm(safeKey(root, key), { force: true }),
-    localPath: (key) => safeKey(root, key),
+    signedGetUrl: async () => null,
+    signedPutUrl: async () => null,
   };
+}
+
+export interface S3Config { bucket: string; region: string; endpoint?: string; accessKeyId: string; secretAccessKey: string; forcePathStyle: boolean; prefix: string }
+
+export function s3ConfigFromEnv(env = process.env): S3Config {
+  const need = (k: string) => { const v = env[k]; if (!v) throw new Error(`Variable ${k} manquante (STORAGE_DRIVER=s3)`); return v; };
+  return {
+    bucket: need('S3_BUCKET'), region: env.S3_REGION || 'auto', endpoint: env.S3_ENDPOINT || undefined,
+    accessKeyId: need('S3_ACCESS_KEY_ID'), secretAccessKey: need('S3_SECRET_ACCESS_KEY'),
+    forcePathStyle: env.S3_FORCE_PATH_STYLE !== 'false', prefix: (env.S3_PREFIX ?? '').replace(/^\/+|\/+$/g, ''),
+  };
+}
+
+export function s3Storage(cfg: S3Config = s3ConfigFromEnv()): StorageAdapter {
+  // Import paresseux : le SDK n'est chargé que si le pilote S3 est utilisé.
+  let lib: Promise<{ s3: any; S: typeof import('@aws-sdk/client-s3'); presign: typeof import('@aws-sdk/s3-request-presigner').getSignedUrl }> | null = null;
+  const load = () => (lib ??= (async () => {
+    const S = await import('@aws-sdk/client-s3');
+    const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+    const s3 = new S.S3Client({ region: cfg.region, endpoint: cfg.endpoint, forcePathStyle: cfg.forcePathStyle, credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey } });
+    return { s3, S, presign: getSignedUrl };
+  })());
+  const K = (key: string) => { assertKey(key); return cfg.prefix ? `${cfg.prefix}/${key}` : key; };
+  const body = async (r: any) => Buffer.from(await r.Body.transformToByteArray());
+  return {
+    driver: 's3',
+    async put(key, data, contentType) { const { s3, S } = await load(); await s3.send(new S.PutObjectCommand({ Bucket: cfg.bucket, Key: K(key), Body: data, ContentType: contentType })); },
+    async get(key) { const { s3, S } = await load(); return body(await s3.send(new S.GetObjectCommand({ Bucket: cfg.bucket, Key: K(key) }))); },
+    async head(key, bytes) { const { s3, S } = await load(); return body(await s3.send(new S.GetObjectCommand({ Bucket: cfg.bucket, Key: K(key), Range: `bytes=0-${bytes - 1}` }))); },
+    async size(key) {
+      const { s3, S } = await load();
+      try { return Number((await s3.send(new S.HeadObjectCommand({ Bucket: cfg.bucket, Key: K(key) }))).ContentLength ?? 0); } catch { return null; }
+    },
+    async remove(key) { const { s3, S } = await load(); await s3.send(new S.DeleteObjectCommand({ Bucket: cfg.bucket, Key: K(key) })); },
+    async signedGetUrl(key, o) {
+      const { s3, S, presign } = await load();
+      const safeName = o.filename?.replace(/[^\w.\-]/g, '_');
+      return presign(s3, new S.GetObjectCommand({ Bucket: cfg.bucket, Key: K(key), ResponseContentType: o.contentType,
+        ResponseContentDisposition: safeName ? `${o.download ? 'attachment' : 'inline'}; filename="${safeName}"` : undefined }), { expiresIn: o.expiresIn ?? 120 });
+    },
+    async signedPutUrl(key, contentType, expiresIn = 900) {
+      const { s3, S, presign } = await load();
+      return presign(s3, new S.PutObjectCommand({ Bucket: cfg.bucket, Key: K(key), ContentType: contentType }), { expiresIn });
+    },
+  };
+}
+
+let _default: StorageAdapter | null = null;
+/** Pilote choisi par STORAGE_DRIVER (local par défaut). */
+export function createStorage(): StorageAdapter {
+  return (_default ??= process.env.STORAGE_DRIVER === 's3' ? s3Storage() : localStorage());
 }
 
 export const newStorageKey = (orgId: string, ext: string) => `${orgId}/${new Date().toISOString().slice(0, 7)}/${randomUUID()}.${ext}`;

@@ -22,7 +22,9 @@
   "dependencies": {
     "three": "0.187.0",
     "zod": "4.6.7",
-    "papaparse": "5.7.0"
+    "papaparse": "5.7.0",
+    "@aws-sdk/client-s3": "3.1156.0",
+    "@aws-sdk/s3-request-presigner": "3.1156.0"
   },
   "devDependencies": {
     "@types/three": "0.187.0",

@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { effectiveCrop, type PageGeom } from '@/lib/plan-transform';
 import { autoBindGenerated } from '../../models/actions';
 import { usePlanTexture } from '@/components/visit/planTexture';
+import { uploadFile } from '@/lib/upload-client';
 
 interface Props {
   drawing: Drawing; dirty: boolean; geom: PageGeom; projectId: string; canEdit: boolean; generatedModelId: string | null;
@@ -63,13 +64,8 @@ export function Preview3D(p: Props) {
       const root = new THREE.Group(); root.name = `reconstruction_${p.page.id.slice(0, 8)}`; root.add(g);
       root.userData = { generatedFrom: p.page.id, note: 'Reconstruction simple à partir des éléments validés — non photoréaliste' };
       const glb = objectToGlb(root, { generator: 'Tweadup Immo 360 — reconstruction' });
-      const fd = new FormData();
-      fd.set('purpose', 'model'); fd.set('project_id', p.projectId); fd.set('name', `Reconstruction — ${p.page.label}`);
-      if (p.generatedModelId) fd.set('model_id', p.generatedModelId);
-      fd.set('file', new File([glb], `reconstruction-${p.page.id.slice(0, 8)}.glb`, { type: 'model/gltf-binary' }));
-      const r = await fetch('/api/upload', { method: 'POST', body: fd });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error);
+      const j = await uploadFile(new File([glb], `reconstruction-${p.page.id.slice(0, 8)}.glb`, { type: 'model/gltf-binary' }), 'model',
+        { project_id: p.projectId, name: `Reconstruction — ${p.page.label}`, ...(p.generatedModelId ? { model_id: p.generatedModelId } : {}) });
       const bindings = p.drawing.rooms.filter((x) => x.provenance === 'validated' && x.lotId).map((x) => ({ node: `room_${x.id}`, type: 'lot' as const, id: x.lotId! }));
       const b = await autoBindGenerated(j.revisionId, bindings);
       if (!b.ok) throw new Error(b.error);

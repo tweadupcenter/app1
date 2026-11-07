@@ -4,8 +4,8 @@ import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { buildDemoScene, demoSpec, demoViewpoints } from '@immo/core/demo-scene';
 import { inspectGlb, objectToGlb } from '@immo/core/glb';
-import { localStorage, newStorageKey, sha256 } from '@immo/core/storage';
-import { loadRootEnv, ROOT_DIR, buildPublicationSnapshot } from './index';
+import { createStorage, localStorage, newStorageKey, sha256 } from '@immo/core/storage';
+import { loadRootEnv, pgConfig, ROOT_DIR, buildPublicationSnapshot } from './index';
 import { hashPassword } from './password';
 import path from 'node:path';
 
@@ -13,7 +13,7 @@ const FICTIF = 'Projet fictif de démonstration — aucune donnée réelle';
 
 export async function seed(adminUrl: string, opts: { password: string; storageDir?: string; log?: boolean }) {
   const log = (...a: unknown[]) => opts.log !== false && console.log(...a);
-  const client = new pg.Client({ connectionString: adminUrl });
+  const client = new pg.Client(pgConfig(adminUrl));
   await client.connect();
   const q = (sql: string, p: unknown[] = []) => client.query(sql, p);
   const one = async (sql: string, p: unknown[] = []) => (await q(sql, p)).rows[0];
@@ -25,7 +25,8 @@ export async function seed(adminUrl: string, opts: { password: string; storageDi
       log('Données de démonstration déjà présentes (utiliser pnpm db:reset pour repartir de zéro).');
       return;
     }
-    const storage = localStorage(opts.storageDir ? path.resolve(opts.storageDir) : path.join(ROOT_DIR, 'storage'));
+    // Pilote S3 si configuré (Vercel), sinon disque ; les tests imposent un dossier temporaire.
+    const storage = opts.storageDir || process.env.STORAGE_DRIVER !== 's3' ? localStorage(opts.storageDir ? path.resolve(opts.storageDir) : path.join(ROOT_DIR, 'storage')) : createStorage();
     const pw = await hashPassword(opts.password);
     await q('begin');
 
@@ -93,7 +94,7 @@ export async function seed(adminUrl: string, opts: { password: string; storageDi
     const glb = objectToGlb(buildDemoScene(spec), { generator: 'Tweadup Immo 360 — scène de démonstration', extras: { fictional: true } });
     const info = inspectGlb(glb);
     const key = newStorageKey(org, 'glb');
-    await storage.put(key, glb);
+    await storage.put(key, glb, 'model/gltf-binary');
     const media = (await one(
       `insert into immo.media (org_id, project_id, kind, storage_key, mime, size_bytes, original_name, sha256, meta, created_by)
        values ($1,$2,'model',$3,'model/gltf-binary',$4,'residence-demo-fictive.glb',$5,$6,$7) returning id`,
@@ -197,6 +198,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   loadRootEnv();
   const url = process.env.DATABASE_ADMIN_URL;
   if (!url) { console.error('DATABASE_ADMIN_URL manquant'); process.exit(1); }
-  seed(url, { password: process.env.SEED_PASSWORD ?? 'demo-immo-360', storageDir: process.env.STORAGE_DIR ? path.resolve(ROOT_DIR, process.env.STORAGE_DIR) : undefined })
+  seed(url, { password: process.env.SEED_PASSWORD ?? 'demo-immo-360', storageDir: process.env.STORAGE_DRIVER === 's3' ? undefined : (process.env.STORAGE_DIR ? path.resolve(ROOT_DIR, process.env.STORAGE_DIR) : undefined) })
     .catch((e) => { console.error(e); process.exit(1); });
 }

@@ -20,9 +20,20 @@ pg.types.setTypeParser(20, (v) => (v === null ? null : Number(v)));
 export type Db = pg.Pool;
 export type Tx = pg.PoolClient;
 
-export function createPool(url = process.env.DATABASE_URL, max = 10): pg.Pool {
+/**
+ * Options de connexion. DATABASE_SSL : "require" (certificat vérifié) ou "no-verify"
+ * (chiffré sans vérification du certificat, utile avec certains poolers comme celui de Supabase).
+ */
+export function pgConfig(url: string): pg.ClientConfig {
+  const sslMode = process.env.DATABASE_SSL;
+  const ssl = sslMode === 'require' ? { rejectUnauthorized: true } : sslMode === 'no-verify' ? { rejectUnauthorized: false } : undefined;
+  const connectionString = ssl ? url.replace(/([?&])sslmode=[^&]*&?/, '$1').replace(/[?&]$/, '') : url;
+  return { connectionString, ssl, application_name: 'immo360' };
+}
+
+export function createPool(url: string | undefined = process.env.DATABASE_URL, max = 10): pg.Pool {
   if (!url) throw new Error('DATABASE_URL manquant');
-  return new pg.Pool({ connectionString: url, max, application_name: 'immo360' });
+  return new pg.Pool({ ...pgConfig(url), max, idleTimeoutMillis: 10_000 });
 }
 
 export interface DbContext { userId: string | null; orgId: string | null }

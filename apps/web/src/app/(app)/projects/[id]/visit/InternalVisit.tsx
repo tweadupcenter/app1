@@ -3,6 +3,7 @@ import { SceneViewer } from '@/components/visit/SceneViewer';
 import type { SceneData } from '@/lib/scene-types';
 import type { Locale } from '@/lib/i18n';
 import { deleteViewpoint, saveViewpoint } from './actions';
+import { uploadFile } from '@/lib/upload-client';
 
 export function InternalVisit({ data, locale, canManage, canSell, initialLotId }: { data: SceneData; locale: Locale; canManage: boolean; canSell: boolean; initialLotId?: string | null }) {
   return (
@@ -12,9 +13,8 @@ export function InternalVisit({ data, locale, canManage, canSell, initialLotId }
         saveViewpoint: canManage ? async (i) => { const r = await saveViewpoint({ ...i, projectId: data.project.id, kind: i.kind as any }); return r.ok ? { ok: true } : { ok: false, error: r.error }; } : async () => ({ ok: false, error: 'Réservé aux administrateurs et chefs de projet.' }),
         deleteViewpoint: async (id) => { const r = await deleteViewpoint(id); return r.ok ? { ok: true } : { ok: false, error: r.error }; },
         uploadCapture: async (blob) => {
-          const fd = new FormData(); fd.set('purpose', 'capture'); fd.set('project_id', data.project.id); fd.set('file', new File([blob], 'capture.png', { type: 'image/png' }));
-          const r = await fetch('/api/upload', { method: 'POST', body: fd }); const j = await r.json().catch(() => ({}));
-          return r.ok ? { ok: true } : { ok: false, error: j.error ?? 'Erreur' };
+          try { await uploadFile(new File([blob], 'capture.png', { type: 'image/png' }), 'capture', { project_id: data.project.id }); return { ok: true }; }
+          catch (e) { return { ok: false, error: (e as Error).message }; }
         },
       } : undefined} />
   );

@@ -1,5 +1,5 @@
 import { inspectGlb } from '@immo/core/glb';
-import { localStorage } from '@immo/core/storage';
+import { createStorage } from '@immo/core/storage';
 import type { JobCtx } from './index';
 
 /**
@@ -7,7 +7,7 @@ import type { JobCtx } from './index';
  * de la révision active (reportées si le nœud existe encore, signalées sinon).
  */
 export async function inspectModel({ job, tx, log }: JobCtx) {
-  const storage = localStorage(process.env.STORAGE_DIR);
+  const storage = createStorage();
   const rev = await tx(async (t) => (await t.query(`select r.*, m.storage_key, mo.active_revision_id, mo.id as model_id from immo.model_revisions r
     join immo.media m on m.id=r.media_id join immo.models mo on mo.id=r.model_id where r.id=$1`, [job.payload.revision_id])).rows[0]);
   if (!rev) throw new Error('Révision introuvable');

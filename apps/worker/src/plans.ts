@@ -4,7 +4,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import DxfParser from 'dxf-parser';
 import { drawingSchema, type Drawing } from '@immo/core';
-import { imageSize, localStorage, newStorageKey, sha256 } from '@immo/core/storage';
+import { imageSize, createStorage, newStorageKey, sha256 } from '@immo/core/storage';
 import { run } from './proc';
 import type { JobCtx } from './index';
 
@@ -12,7 +12,7 @@ const MAX_PAGES = 40;
 
 /** PDF multipages -> PNG par page (pdftoppm, 110 dpi). Image -> page unique. */
 export async function rasterizePlan({ job, tx, progress, log }: JobCtx) {
-  const storage = localStorage(process.env.STORAGE_DIR);
+  const storage = createStorage();
   const plan = await tx(async (t) => (await t.query(`select p.*, m.storage_key, m.mime, m.width, m.height from immo.plans p join immo.media m on m.id=p.source_media_id where p.id=$1`, [job.payload.plan_id])).rows[0]);
   if (!plan) throw new Error('Plan introuvable');
   try {
@@ -38,7 +38,7 @@ export async function rasterizePlan({ job, tx, progress, log }: JobCtx) {
         const buf = await readFile(path.join(dir, f));
         const dims = imageSize(buf);
         const key = newStorageKey(plan.org_id, 'png');
-        await storage.put(key, buf);
+        await storage.put(key, buf, 'image/png');
         await tx(async (t) => {
           const m = (await t.query(`insert into immo.media (org_id, project_id, kind, storage_key, mime, size_bytes, original_name, sha256, width, height, created_by, meta)
             values ($1,$2,'plan_page',$3,'image/png',$4,$5,$6,$7,$8,$9,$10) returning id`,
@@ -100,7 +100,7 @@ export function dxfToDrawing(text: string): { drawing: Drawing; report: Record<s
 }
 
 export async function importDxf({ job, tx, log }: JobCtx) {
-  const storage = localStorage(process.env.STORAGE_DIR);
+  const storage = createStorage();
   const plan = await tx(async (t) => (await t.query(`select p.*, m.storage_key from immo.plans p join immo.media m on m.id=p.source_media_id where p.id=$1`, [job.payload.plan_id])).rows[0]);
   if (!plan) throw new Error('Plan introuvable');
   try {

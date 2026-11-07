@@ -52,5 +52,7 @@ cd apps/web && E2E_RESET=1 pnpm test:e2e   # parcours complets (serveur + worker
 
 `DATABASE_ADMIN_URL_TEST` permet de choisir la base des tests d'intégration (défaut `postgres://postgres:postgres@localhost:5432/immo360_test`).
 
+**Mise en ligne sur Vercel** : voir [docs/VERCEL.md](docs/VERCEL.md) (Supabase pour la base et les fichiers, worker sur un service Docker).
+
 Voir aussi : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md) ·
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) · [docs/UNREAL.md](docs/UNREAL.md) · [docs/LIMITATIONS.md](docs/LIMITATIONS.md)

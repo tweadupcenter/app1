@@ -27,3 +27,18 @@ export function verifyRenderToken(token: string): RenderClaims | null {
     return c;
   } catch { return null; }
 }
+
+/** Jeton signé générique (ex. autorisation d'envoi direct vers le stockage). */
+export function signPayload(payload: Record<string, unknown>, ttlSeconds: number): string {
+  const body = Buffer.from(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + ttlSeconds })).toString('base64url');
+  return `${body}.${createHmac('sha256', secret()).update('payload:' + body).digest('base64url')}`;
+}
+
+export function verifyPayload<T = Record<string, unknown>>(token: string): (T & { exp: number }) | null {
+  const [body, sig] = token.split('.');
+  if (!body || !sig) return null;
+  const expected = createHmac('sha256', secret()).update('payload:' + body).digest();
+  const given = Buffer.from(sig, 'base64url');
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  try { const p = JSON.parse(Buffer.from(body, 'base64url').toString()); return p.exp < Date.now() / 1000 ? null : p; } catch { return null; }
+}

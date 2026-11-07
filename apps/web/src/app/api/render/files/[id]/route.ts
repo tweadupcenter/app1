@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyRenderToken } from '@immo/core/token';
 import { tx } from '@/lib/db';
-import { fileResponse } from '@/lib/http';
-import { storage } from '@/lib/storage';
+import { serveMedia } from '@/lib/http';
 
 export const runtime = 'nodejs';
 
@@ -13,5 +12,5 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!c || !/^[0-9a-f-]{36}$/.test(id)) return NextResponse.json({ error: 'Jeton invalide' }, { status: 403 });
   const m = await tx({ userId: c.user, orgId: c.org }, (x) => x.query(`select storage_key, mime from immo.media where id=$1 and kind in ('model','logo','image')`, [id]).then((r) => r.rows[0]));
   if (!m) return NextResponse.json({ error: 'Introuvable' }, { status: 404 });
-  return fileResponse(await storage().get(m.storage_key), m.mime);
+  return serveMedia(m);
 }

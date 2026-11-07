@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm build",
+  "regions": ["cdg1"],
+  "functions": {
+    "src/app/**/*": { "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/cron/expire-holds", "schedule": "*/10 * * * *" }
+  ]
+}

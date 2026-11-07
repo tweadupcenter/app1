@@ -8,7 +8,8 @@
     "seed": "tsx src/seed.ts",
     "reset": "tsx src/migrate.ts --reset && tsx src/seed.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "storage:to-s3": "tsx src/storage-to-s3.ts"
   },
   "dependencies": {
     "@immo/core": "workspace:*",

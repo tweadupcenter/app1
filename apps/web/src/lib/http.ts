@@ -20,3 +20,15 @@ export function fileResponse(buf: Buffer, mime: string, opts: { filename?: strin
   if (opts.filename) headers['Content-Disposition'] = `${opts.download ? 'attachment' : 'inline'}; filename="${opts.filename.replace(/[^\w.\-]/g, '_')}"`;
   return new NextResponse(new Uint8Array(buf), { headers });
 }
+
+/**
+ * Sert un média après contrôle des droits : redirection vers un lien signé de courte durée (stockage S3,
+ * évite la limite de taille des fonctions Vercel) ou contenu direct (stockage local).
+ */
+export async function serveMedia(m: { storage_key: string; mime: string; original_name?: string | null }, opts: { isPublic?: boolean; download?: boolean } = {}) {
+  const { storage } = await import('./storage');
+  const st = storage();
+  const signed = await st.signedGetUrl(m.storage_key, { expiresIn: 120, contentType: m.mime, filename: m.original_name ?? undefined, download: opts.download });
+  if (signed) return NextResponse.redirect(signed, { status: 302, headers: { 'Cache-Control': 'private, no-store' } });
+  return fileResponse(await st.get(m.storage_key), m.mime, { filename: m.original_name ?? undefined, isPublic: opts.isPublic, download: opts.download });
+}

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { RESOLUTIONS, totalDuration, type Shot } from '@immo/core';
 import { signRenderToken } from '@immo/core/token';
-import { localStorage, newStorageKey, sha256 } from '@immo/core/storage';
+import { createStorage, newStorageKey, sha256 } from '@immo/core/storage';
 import { run } from './proc';
 import type { JobCtx } from './index';
 
@@ -32,7 +32,7 @@ function ffmpegEncoder(args: string[], timeoutMs: number) {
 }
 
 export async function exportVideo({ job, tx, progress, log }: JobCtx) {
-  const storage = localStorage(process.env.STORAGE_DIR);
+  const storage = createStorage();
   const seq = await tx(async (t) => (await t.query(`select * from immo.sequences where id=$1`, [job.payload.sequence_id])).rows[0]);
   if (!seq) throw new Error('Séquence introuvable');
   const resolution: string = job.payload.resolution ?? seq.resolution;
@@ -105,7 +105,7 @@ export async function exportVideo({ job, tx, progress, log }: JobCtx) {
 
   const buf = await readFile(out);
   const key = newStorageKey(job.org_id, 'mp4');
-  await storage.put(key, buf);
+  await storage.put(key, buf, 'video/mp4');
   await rm(dir, { recursive: true, force: true });
   const mediaId = await tx(async (t) => (await t.query(
     `insert into immo.media (org_id, project_id, kind, storage_key, mime, size_bytes, original_name, sha256, width, height, duration_s, codec, meta, created_by)

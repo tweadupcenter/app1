@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { uploadFile } from '@/lib/upload-client';
 
 /** Envoi d'un fichier vers /api/upload ; affiche l'erreur exacte renvoyée par le serveur. */
 export function Uploader({ purpose, fields = {}, accept, label, onDone, showPublishable }: {
@@ -12,15 +13,8 @@ export function Uploader({ purpose, fields = {}, accept, label, onDone, showPubl
   const router = useRouter();
   async function send(file: File) {
     setBusy(true); setMsg(null);
-    const fd = new FormData();
-    fd.set('purpose', purpose);
-    for (const [k, v] of Object.entries(fields)) fd.set(k, v);
-    if (showPublishable) fd.set('publishable', String(pub));
-    fd.set('file', file);
     try {
-      const r = await fetch('/api/upload', { method: 'POST', body: fd });
-      const j = await r.json().catch(() => ({ error: `Réponse invalide (${r.status})` }));
-      if (!r.ok) throw new Error(j.error ?? `Erreur ${r.status}`);
+      const j = await uploadFile(file, purpose, { ...fields, ...(showPublishable ? { publishable: String(pub) } : {}) });
       setMsg({ ok: true, text: 'Fichier reçu.' });
       onDone?.(j);
       router.refresh();
