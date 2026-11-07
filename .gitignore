@@ -10,3 +10,4 @@ playwright-report
 apps/web/next-env.d.ts
 *.tsbuildinfo
 apercus-villa/
+export-pc/
