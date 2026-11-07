@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const cfg = precheck(b.purpose, b.filename, b.size);
     const s = await assertSession(cfg.action);
     const st = storage();
-    if (st.driver !== 's3') return NextResponse.json({ mode: 'multipart' });
+    if (st.driver === 'local') return NextResponse.json({ mode: 'multipart' });
     const key = newStorageKey(s.orgId, storageExt(b.purpose, b.filename));
     const contentType = b.contentType || 'application/octet-stream';
     const url = await st.signedPutUrl(key, contentType, 900);

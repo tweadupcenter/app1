@@ -26,7 +26,7 @@ export async function seed(adminUrl: string, opts: { password: string; storageDi
       return;
     }
     // Pilote S3 si configuré (Vercel), sinon disque ; les tests imposent un dossier temporaire.
-    const storage = opts.storageDir || process.env.STORAGE_DRIVER !== 's3' ? localStorage(opts.storageDir ? path.resolve(opts.storageDir) : path.join(ROOT_DIR, 'storage')) : createStorage();
+    const storage = opts.storageDir || !['s3', 'supabase'].includes(process.env.STORAGE_DRIVER ?? '') ? localStorage(opts.storageDir ? path.resolve(opts.storageDir) : path.join(ROOT_DIR, 'storage')) : createStorage();
     const pw = await hashPassword(opts.password);
     await q('begin');
 
@@ -198,6 +198,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   loadRootEnv();
   const url = process.env.DATABASE_ADMIN_URL;
   if (!url) { console.error('DATABASE_ADMIN_URL manquant'); process.exit(1); }
-  seed(url, { password: process.env.SEED_PASSWORD ?? 'demo-immo-360', storageDir: process.env.STORAGE_DRIVER === 's3' ? undefined : (process.env.STORAGE_DIR ? path.resolve(ROOT_DIR, process.env.STORAGE_DIR) : undefined) })
+  seed(url, { password: process.env.SEED_PASSWORD ?? 'demo-immo-360', storageDir: ['s3', 'supabase'].includes(process.env.STORAGE_DRIVER ?? '') ? undefined : (process.env.STORAGE_DIR ? path.resolve(ROOT_DIR, process.env.STORAGE_DIR) : undefined) })
     .catch((e) => { console.error(e); process.exit(1); });
 }

@@ -6,7 +6,7 @@ import { mkdir, readFile, rm, stat, writeFile, open } from 'node:fs/promises';
 import path from 'node:path';
 
 export interface StorageAdapter {
-  readonly driver: 'local' | 's3';
+  readonly driver: 'local' | 's3' | 'supabase';
   put(key: string, data: Uint8Array, contentType?: string): Promise<void>;
   get(key: string): Promise<Buffer>;
   /** Premiers octets du fichier (détection du type, dimensions) sans tout télécharger. */
@@ -99,10 +99,65 @@ export function s3Storage(cfg: S3Config = s3ConfigFromEnv()): StorageAdapter {
   };
 }
 
+
+/**
+ * Supabase Storage via son API REST (clé « service role », côté serveur uniquement) :
+ * aucune clé S3 à créer ; liens signés de lecture et d'envoi fournis par Supabase.
+ */
+export function supabaseStorage(env = process.env): StorageAdapter {
+  const base = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+  const key = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SECRET_KEY || '';
+  const bucket = env.STORAGE_BUCKET || 'immo360';
+  if (!base || !key) throw new Error('SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY requis (STORAGE_DRIVER=supabase)');
+  const auth = { Authorization: `Bearer ${key}`, apikey: key };
+  const enc = (k: string) => { assertKey(k); return k.split('/').map(encodeURIComponent).join('/'); };
+  const call = async (path: string, init: RequestInit = {}) => {
+    const r = await fetch(`${base}/storage/v1${path}`, { ...init, headers: { ...auth, ...(init.headers ?? {}) } });
+    if (!r.ok) throw new Error(`Supabase Storage ${init.method ?? 'GET'} ${path.split('?')[0]} : ${r.status} ${(await r.text()).slice(0, 200)}`);
+    return r;
+  };
+  return {
+    driver: 'supabase',
+    async put(k, data, contentType) {
+      await call(`/object/${bucket}/${enc(k)}`, { method: 'POST', headers: { 'Content-Type': contentType ?? 'application/octet-stream', 'x-upsert': 'true' }, body: data as unknown as BodyInit });
+    },
+    async get(k) { return Buffer.from(await (await call(`/object/authenticated/${bucket}/${enc(k)}`)).arrayBuffer()); },
+    async head(k, bytes) {
+      const r = await call(`/object/authenticated/${bucket}/${enc(k)}`, { headers: { Range: `bytes=0-${bytes - 1}` } });
+      return Buffer.from(await r.arrayBuffer()).subarray(0, bytes);
+    },
+    async size(k) {
+      const r = await fetch(`${base}/storage/v1/object/authenticated/${bucket}/${enc(k)}`, { method: 'HEAD', headers: auth });
+      return r.ok ? Number(r.headers.get('content-length') ?? 0) : null;
+    },
+    async remove(k) { await call(`/object/${bucket}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: [k] }) }); },
+    async signedGetUrl(k, o) {
+      const j = await (await call(`/object/sign/${bucket}/${enc(k)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: o.expiresIn ?? 120 }) })).json();
+      const name = o.filename?.replace(/[^\w.\-]/g, '_');
+      return `${base}/storage/v1${j.signedURL}${o.download && name ? `&download=${encodeURIComponent(name)}` : ''}`;
+    },
+    async signedPutUrl(k) {
+      const j = await (await call(`/object/upload/sign/${bucket}/${enc(k)}`, { method: 'POST', headers: { 'x-upsert': 'true' } })).json();
+      return `${base}/storage/v1${j.url}`;
+    },
+  };
+}
+
+/** Crée le bucket privé s'il n'existe pas (installation). */
+export async function ensureSupabaseBucket(env = process.env) {
+  const base = (env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+  const key = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SECRET_KEY || '';
+  const id = env.STORAGE_BUCKET || 'immo360';
+  const r = await fetch(`${base}/storage/v1/bucket`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, name: id, public: false }) });
+  if (!r.ok && r.status !== 409 && !(await r.text()).includes('already exists')) throw new Error(`Création du bucket impossible (${r.status})`);
+}
+
 let _default: StorageAdapter | null = null;
-/** Pilote choisi par STORAGE_DRIVER (local par défaut). */
+/** Pilote choisi par STORAGE_DRIVER : local (défaut), s3 ou supabase. */
 export function createStorage(): StorageAdapter {
-  return (_default ??= process.env.STORAGE_DRIVER === 's3' ? s3Storage() : localStorage());
+  const d = process.env.STORAGE_DRIVER;
+  return (_default ??= d === 's3' ? s3Storage() : d === 'supabase' ? supabaseStorage() : localStorage());
 }
 
 export const newStorageKey = (orgId: string, ext: string) => `${orgId}/${new Date().toISOString().slice(0, 7)}/${randomUUID()}.${ext}`;
